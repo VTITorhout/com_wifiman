@@ -30,7 +30,67 @@ Merk op dat deze bibliotheek zeer uitgebreid is en dat er momenteel nog veel wor
 ![Correcte header file](./assets/bib_tag.png)
 
 # Basis captive portal
+
+Het meest essentiële onderdeel is het verbinden met een privé WiFi-netwerk. Hiervoor gaan we volgende basis code gebruiken:
+
+```cpp
+#include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
+
+WiFiManager portal; //set global, so we can access on request
+
+void setup(){
+  Serial.begin(115200); //needed for debug, library will output a lot (due to beta version)
+  bool test = portal.autoConnect("615-CaptivePortal"); //create blocking portal which tries to connect to AP if settings have been found
+  if(!test){
+    //provided credentials does not result in connection to AP
+    Serial.print("WiFi:\tUnable to connect to SSID ");
+    Serial.println(portal.getWiFiSSID());
+	portal.resetSettings();	//reset wrong credentials
+    while(1); //no need to continue
+  }
+  Serial.print("WiFi:\tSuccesfully connected to SSID ");
+  Serial.println(portal.getWiFiSSID());
+  Serial.println("PRG:\tEntering loop");
+}
+
+void loop(){
+  
+}
+```
+
+Het zou kunnen zijn dat door toedoen van eerdere testen er reeds een SSID en wachtwoord zou opgeslagen zijn. Indien we niet verbonden geraken het de opgeslagen SSID worden de huidige *credentials* verwijderd en stopt de code met verder uit te voeren. Op het moment dat we vervolgens een reset doorvoeren (of de spannning kortstondig verwijderen) zal de ESP opstarten zonder *credentials* en zal het *captive portal* geactiveerd worden. 
+
+In onderstaande afbeelding kan gezien worden wat er gebeurd in de seriële monitor wanneer er geen *credentials* zijn opgeslagen. Er wordt overgegaan van STA mode naar AP mode, waar vervolgens een nieuw netwerk wordt gecreëerd met de SSID *615-CaptivePortal*. De webserver voor het *captive portal* wordt gestart en er wordt gewacht op een gebruiker die verbinding maakt met het netwerk voor de nodige *credentials* in te voeren.
+
+![Debug with no settings](./assets/dbg_01_no_settings.png)
+
+Op het toestel die gebruikt wordt om verbinding te maken het netwerk is het volgende waar te nemen:
+
+![Setup credentials](./assets/gsm_01.png)
+
+1. Na het verbinden met het netwerk *615-CaptivePortal* komt een melding dat er verbinding is, maar dat er details te bekijken zijn. Dit is typisch bij een *captive portal* waar nog nood is aan een procedure om effectief verbonden te zijn.
+2. Op de webpagina is te zien dat er geen AP instellingen zijn. We kiezen vervolgens voor *Configure WiFi* om de juiste instellingen door te voeren.
+3. Langs boven wordt een lijst met alle beschikbare netwerken weergegeven alsook hun signaalsterkte. Klik op de netwerknaam om dit automatisch over te nemen in het SSID veld.
+4. Vul vervolgens het correcte *password* in. Via *Show Password* kun je zien wat je invult. 
+5. Klik vervolgens op *Save* om de instellingen op te slaan.
+6. De code zal nu herstarten en proberen te verbinden met het gekozen netwerk. Als dit niet lukt zullen de instellingen gewist worden en bij herstarten zal je opnieuw aan het AP kunnen.
+
+Als alles goed verloopt zul het het volgende te zien krijgen in de seriële monitor:
+
+![Debug with saved settings](./assets/dbg_01_settings_saved.png)
+
+Hier is duidelijk te zien dat er verbinding wordt gemaakt met de nieuwe SSID (die gekozen is in vorige stappen) en dat dit probleemloos lukt (de ESP ontvangt een IP). Het *captive portal* is nu niet meer nodig, en het toestel schakelt om naar STA mode. De uitkomtst van de *captive portal* is positief, dus kan er verder gegaan worden naar het programma van de gebruiker (in de loop).
+
+Bij het resetten van het programma is het volgende te zien in de seriële monitor:
+
+![Debug directly connected](./assets/dbg_01_connected.png)
+
+De *captive portal* wordt nog niet gestart. Er wordt eerst geprobeerd verbinding te maken het de huidige *credentials* Dit lukt binnen de twee seconden en meteen wordt overgegaan op het gebruikersprogramma (in de loop).
+
 # Captive portal on request
+
+Dit is op zich goed om te testen, maar niet voor productie. Stel dat het netwerk even offline is, dan zal het toestel zijn *credentials* verwijderen, wat natuurlijk ongewenst is.
+
 # Extra instellingen
 # Custom menu's & HTML
 # OTA
