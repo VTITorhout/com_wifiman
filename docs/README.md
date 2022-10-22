@@ -7,14 +7,14 @@ Wanneer een toestel aangekocht wordt die verbinding moet maken met een privé ne
 	* Slaagt het toester er niet in om een verbinding te maken, dan is het meest logische om terug te herstarten in AP-mode zodat de gebruiker wijzigingen kan doorvoeren aan de instellingen.
 	
 Tijdens deze module worden de meest essentiële zaken aangehaald in verschillende stappen.
-1. [Basis configuratie](#???) voor het *captive portal* om verbinding te maken met een privé netwerk
-2. Opstarten van het *captive portal* op [aanvraag](#???) van de gebruiker
-3. Extra instellingen afvragen en opslaan
-4. Custom menu's / HTML
+1. [Basis configuratie](#basis-captive-portal) voor het *captive portal* om verbinding te maken met een privé netwerk
+2. Opstarten van het *captive portal* op [aanvraag](#captive-portal-on-request) van de gebruiker
+3. [Extra instellingen](#extra-instellingen) afvragen en opslaan
+4. [Custom](#custom-menus--html) menu's / HTML
 
-# Installatie bibiliotheel
+# Installatie bibiliotheek
 
-# **Basis** captive portal
-# Captive portal **on request**
-# **Extra** instellingen
-# **Custom** menu's & HTML 
+# Basis captive portal
+# Captive portal on request
+# Extra instellingen
+# Custom menu's & HTML 
