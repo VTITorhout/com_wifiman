@@ -5,6 +5,8 @@ Wanneer een toestel aangekocht wordt die verbinding moet maken met een privé ne
 2. Bij het opslaan van de instellingen herstart het toestel. Aangezien dit toestel nu voorzien is van instellingen start het niet meer op in *acces point* mode (AP), maar in *station* mode (STA). Hierbij probeert het toestel verbinding te maken met het privé netwerk door gebruik te maken van de nodige *credentials*.
 	* Slaagt het  toestel er in om een verbinding te maken, dan is de additionele code voor instellingen en verbinding te maken niet meer van toepassing en kan overgeschakeld worden op de effectieve software van het toestel.
 	* Slaagt het toester er niet in om een verbinding te maken, dan is het meest logische om terug te herstarten in AP-mode zodat de gebruiker wijzigingen kan doorvoeren aan de instellingen.
+
+![ESP32 as STA/AP](./assets/esp32_sta_ap.png)
 	
 Tijdens deze module worden de meest essentiële zaken aangehaald in verschillende stappen.
 1. [Basis configuratie](#basis-captive-portal) voor het *captive portal* om verbinding te maken met een privé netwerk
