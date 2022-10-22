@@ -36,16 +36,15 @@ Het meest essentiële onderdeel is het verbinden met een privé WiFi-netwerk. Hi
 ```cpp
 #include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
 
-WiFiManager portal; //set global, so we can access on request
-
 void setup(){
   Serial.begin(115200); //needed for debug, library will output a lot (due to beta version)
-  bool test = portal.autoConnect("615-CaptivePortal"); //create blocking portal which tries to connect to AP if settings have been found
-  if(!test){
+  WiFiManager portal; //set local, only needed in setup
+  bool wifiConnected = portal.autoConnect("615-CaptivePortal"); //create blocking portal which tries to connect to AP if settings have been found
+  if(!wifiConnected){
     //provided credentials does not result in connection to AP
     Serial.print("WiFi:\tUnable to connect to SSID ");
     Serial.println(portal.getWiFiSSID());
-	portal.resetSettings();	//reset wrong credentials
+    portal.resetSettings();  //reset wrong credentials
     while(1); //no need to continue
   }
   Serial.print("WiFi:\tSuccesfully connected to SSID ");
@@ -85,11 +84,56 @@ Bij het resetten van het programma is het volgende te zien in de seriële monito
 
 ![Debug directly connected](./assets/dbg_01_connected.png)
 
-De *captive portal* wordt nog niet gestart. Er wordt eerst geprobeerd verbinding te maken het de huidige *credentials* Dit lukt binnen de twee seconden en meteen wordt overgegaan op het gebruikersprogramma (in de loop).
+De *captive portal* wordt nog niet gestart. Er wordt eerst geprobeerd verbinding te maken het de huidige *credentials*. Dit lukt hier binnen de twee seconden en meteen wordt overgegaan op het gebruikersprogramma (in de loop).
 
 # Captive portal on request
 
 Dit is op zich goed om te testen, maar niet voor productie. Stel dat het netwerk even offline is, dan zal het toestel zijn *credentials* verwijderen, wat natuurlijk ongewenst is.
+
+```cpp
+#include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
+
+#define GO_INTO_SETUP 23
+
+bool wifiConnected; //to prevent user software to execute
+
+bool setupWifi(uint16_t timeout = 0){
+  WiFiManager portal; //create local instance of wifi manager
+  portal.setEnableConfigPortal(false);  //prevent entering captive portal if connection failed
+  if(timeout){
+    //we need the captive portal
+    portal.setConfigPortalTimeout(timeout); //how long to wait for setup?
+    portal.startConfigPortal("615-CaptivePortal"); //create portal with timeout
+  }
+  bool test = portal.autoConnect(); //check if credentials are OK
+  if(!test){
+    //provided credentials does not result in connection to AP
+    Serial.print("WiFi:\tUnable to connect to SSID ");
+    Serial.println(portal.getWiFiSSID());
+  }else{
+    Serial.print("WiFi:\tSuccesfully connected to SSID ");
+    Serial.println(portal.getWiFiSSID());
+  }
+  return test;
+}
+
+void setup(){
+  Serial.begin(115200); //needed for debug, library will output a lot (due to beta version)
+  pinMode(GO_INTO_SETUP,INPUT_PULLUP);
+  wifiConnected = setupWifi(); //just check if we get connected, settings are done on request
+  Serial.println("PRG:\tEntering loop");
+}
+
+void loop(){
+  if(wifiConnected){
+    //user code
+  }
+  //check if we want to enter setup
+  if(!digitalRead(GO_INTO_SETUP)){
+    wifiConnected = setupWifi(60); //setup wifi with timeout of 60 seconds
+  }
+}
+```
 
 # Extra instellingen
 # Custom menu's & HTML
