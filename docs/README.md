@@ -157,7 +157,7 @@ if(!digitalRead(GO_INTO_SETUP)){
 Net zoals bij het vorige programma kan op een identieke manier de *credentials* opgegeven worden via het *captive portal*. 
 
 Het gedeelte rond het *captive portal* is echter wel herschreven. Er kan hier een extra parameter *timeout* meegegeven worden.
-* Indien timeout = 0 wordt er enkel getest of de opgegeven *credentials* leiden tot een verbinding
+* Indien timeout = 0 wordt er enkel getest of de opgegeven *credentials* leiden tot een verbinding. Hiervan wordt gebruik gemaakt in de setup.
 * Indien timeout > 0 wordt een *captive portal* gestart. Indien er geen verbinding met het *captive portal* binnen de opgegeven *timeout* wordt gemaakt wordt er teruggekeerd naar het gebruikersprogramma.
 * Indien er een gebruiker verbinding maakt met het *captive portal* stopt de *timeout* zolang de gebruiker verbonden blijft. Dit kan (en zal) echter in sommige gevallen problemen met zich meebrengen. Zie hier voor het onderdeel [extra instellingen](#extra-instellingen).
 
@@ -178,7 +178,7 @@ std::vector<const char *> portalMenu  = {"wifi","info","exit","sep","erase","upd
 portal.setMenu(portalMenu);
 ```
 
-De layout van het *captive portal* kan herschikt worden naar believen, alsook kan er door de gebruiker beslist worden welke zaken er actief moeten zijn. Het bestand `strings_en.h` die in de bibliotheek terug te vinden is beschrijft alle mogelijkheden, aangezien de documentatie hier te wensen overlaat:
+De layout van het *captive portal* kan bevolkt en herschikt worden naar believen. Het bestand `strings_en.h` die in de bibliotheek terug te vinden is *beschrijft* alle mogelijkheden. Er wordt hier expliciet verwezen naar de code aangezien de documentatie momenteel te wensen overlaat:
 
 ```cpp
 const char * const HTTP_PORTAL_MENU[] PROGMEM = {
@@ -195,9 +195,45 @@ const char * const HTTP_PORTAL_MENU[] PROGMEM = {
 };
 ```
 
+* `wifi`: mogelijkheid om te verbinden met SSID en wachtwoord op te geven. Bij het openen wordt er gescaned naar de beschikbare netwerken die vervolgens in een lijst worden opgenomen.
+* `info`: allerlei informatie over het netwerk, systeem en bibliotheek.
+* `exit`: de *captive portal* wordt hierdoor afgesloten.
+* `sep`: separator; scheidingslijn.
+* `erase`: wis alle instellingen van de WiFi (SSID & paswoord).
+* `update`: mogelijkheid om een nieuw hex bestand in te laden. Op deze manier kan de *firmware* gewijzigd worden zonder dat er gebruik moet gemaakt worden van de Arduino IDE. Let op; dit werkt enkel maar goed op een *echte* browser.
+
+Merk op dat er nog extra mogelijkheden zijn:
+* `0wifi`: identiek als `wifi`, maar dan zonder het scannen tijdens het openen. Hier moet je manueel de SSID opgeven.
+* `param`: mogelijkheid tot [extra instellingen](#extra-instellingen).
+* `close`: het menu van de *captive portal* wordt hierdoor verlaten, maar de *captive portal* blijft actief.
+* `restart`: de ESP wordt hierdoor herstart.
+
 # Extra instellingen
 
 De *WiFi Manager* biedt ook de mogelijkheid om *custom parameters* door te geven. Indien ons toestel naast verbinding met het WiFi netwerk ook nog andere verbindingen moeten maken over het internet, met bijvoorbeeld *cloud* toepassingen, moeten ook hiervoor *credentials* kunnen opgegeven worden.
+
+In het onderdeel [captive portal on request](#captive-portal-on-request) was reeds vermelding gemaakt van `param` die aan het menu kan toegevoegd worden. Deze mogelijkheid in de bibliotheek creëert een extra pagina waarop gebruikerparameters kunnen geplaatst worden. Het toevoegen van gebruikerparameters kan vervolgens gebeuren door het commando `bool addParameter(WiFiManagerParameter *p);`, waarbij `WiFiManagerParameter` als volgt moet opgebouwd worden:
+
+```cpp
+/** 
+  Create custom parameters that can be added to the WiFiManager setup web page
+  @id is used for HTTP queries and must not contain spaces nor other special characters
+*/
+WiFiManagerParameter();
+WiFiManagerParameter(const char *custom);
+WiFiManagerParameter(const char *id, const char *label);
+WiFiManagerParameter(const char *id, const char *label, const char *defaultValue, int length);
+WiFiManagerParameter(const char *id, const char *label, const char *defaultValue, int length, const char *custom);
+WiFiManagerParameter(const char *id, const char *label, const char *defaultValue, int length, const char *custom, int labelPlacement);
+```cpp
+
+Hierbij zijn volgende zaken van belang:
+* `id`: unieke ID waarmee de parameter kan benaderd worden (in HTML).
+* `label`: tekst die voor het gebruikersveld moet geplaatst worden.
+* `defaultValue`: inhoud van het veld, kan gebruikt worden indien de *setting* die reeds in het geheugen zit moet weergegeven worden.
+* `length`:
+* `custom`:
+
 
 # Custom menu's & HTML
 # OTA
