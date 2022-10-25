@@ -88,7 +88,11 @@ De *captive portal* wordt nog niet gestart. Er wordt eerst geprobeerd verbinding
 
 # Captive portal on request
 
-Dit is op zich goed om te testen, maar niet voor productie. Stel dat het netwerk even offline is, dan zal het toestel zijn *credentials* verwijderen, wat natuurlijk ongewenst is.
+Merk op dat bij vorig programma de *credentials* gewist werden wanneer er geen verbinding kon gemaakt worden. Dit is op zich goed om te testen, maar niet voor productie. Stel dat het netwerk even offline is, dan zal het toestel zijn *credentials* verwijderen, wat natuurlijk ongewenst is. 
+
+Maar wat indien we ons vergist hebben van wachtwoord? Of dat we ons privé netwerk hebben aangepast (SSID gewijzigd, wachtwoord gewijzigd)? Er moet dus aan de code een aanpassing gebeuren dat we de instellingen terug kunnen oproepen. 
+
+Onderstaande (herschreven) code bied hier een oplossing. Pin 23 (of andere, vrij te kiezen) wordt gebruikt om het *captive portal* op te roepen. Er is een functie geschreven die zich bezig houdt met het *captive portal*, en die kan aangeroepen worden met al dan niet een timeout. Indien er geen timeout opgegeven wordt, wordt gewoonweg geprobeerd om te verbinden met het netwerk met de huidige *credentials*. Indien wel een timeout wordt opgegeven wordt het *captive portal* gestart voor een bepaalde periode, zodat de gebruiker opnieuw kan verbinden om de instellingen te wijzigen. Het wijzigen kan het wissen of het aanpassen zijn van de *credentials*.
 
 ```cpp
 #include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
@@ -99,22 +103,22 @@ bool wifiConnected; //to prevent user software to execute
 
 bool setupWifi(uint16_t timeout = 0){
   WiFiManager portal; //create local instance of wifi manager
-  portal.setEnableConfigPortal(false);  //prevent entering captive portal if connection failed
-  if(timeout){
-    //we need the captive portal
+  portal.setEnableConfigPortal(false);  //prevent entering captive portal if connection failed, we would like to test credentials if timeout==0
+  if(timeout){  //we need the captive portal
     portal.setConfigPortalTimeout(timeout); //how long to wait for setup?
+    portal.setAPClientCheck(true); //when client is connected, portal can not timeout
+    std::vector<const char *> portalMenu  = {"wifi","info","exit","sep","erase","update"};  //create menu with following possibilities, "sep" is seperator
+    portal.setMenu(portalMenu);
     portal.startConfigPortal("615-CaptivePortal"); //create portal with timeout
   }
   bool test = portal.autoConnect(); //check if credentials are OK
   if(!test){
     //provided credentials does not result in connection to AP
-    Serial.print("WiFi:\tUnable to connect to SSID ");
-    Serial.println(portal.getWiFiSSID());
+    Serial.printf("WiFi:\tUnable to connect to SSID \"%s\"\r\n",portal.getWiFiSSID());
   }else{
-    Serial.print("WiFi:\tSuccesfully connected to SSID ");
-    Serial.println(portal.getWiFiSSID());
+    Serial.printf("WiFi:\tSuccesfully connected to SSID \"%s\"\r\n",portal.getWiFiSSID());
   }
-  return test;
+  return test;  //return connection result to requester
 }
 
 void setup(){
@@ -135,6 +139,65 @@ void loop(){
 }
 ```
 
+Het grote verschil zit hem bij het feit dat de code nu niet automatisch een *captive portal* zal opzetten als er geen verbinding kan gemaakt worden met het netwerk. 
+
+![Debug no connection](./assets/dbg_02_no_settings.png)
+
+Indien er geen *credentials* op het systeem worden aangetroffen wordt er meteen overgegaan naar het gebruikersprogramma. Het is nu aan de gebruiker om het *captive portal* op te roepen op aanvraag. Dit gebeurt door de gekozen pin laag te maken:
+
+```cpp
+//check if we want to enter setup
+if(!digitalRead(GO_INTO_SETUP)){
+  wifiConnected = setupWifi(60); //setup wifi with timeout of 60 seconds
+}
+```
+
+![Debug request captive portal](./assets/dbg_02_request.png)
+
+Net zoals bij het vorige programma kan op een identieke manier de *credentials* opgegeven worden via het *captive portal*. 
+
+Het gedeelte rond het *captive portal* is echter wel herschreven. Er kan hier een extra parameter *timeout* meegegeven worden.
+* Indien timeout = 0 wordt er enkel getest of de opgegeven *credentials* leiden tot een verbinding
+* Indien timeout > 0 wordt een *captive portal* gestart. Indien er geen verbinding met het *captive portal* binnen de opgegeven *timeout* wordt gemaakt wordt er teruggekeerd naar het gebruikersprogramma.
+* Indien er een gebruiker verbinding maakt met het *captive portal* stopt de *timeout* zolang de gebruiker verbonden blijft. Dit kan (en zal) echter in sommige gevallen problemen met zich meebrengen. Zie hier voor het onderdeel [extra instellingen](#extra-instellingen).
+
+Bovenstaande gebeurd door middel van volgende code:
+
+```cpp
+if(timeout){  //we need the captive portal
+  portal.setConfigPortalTimeout(timeout); //how long to wait for setup?
+  portal.setAPClientCheck(true); //when client is connected, portal can not timeout
+  portal.startConfigPortal("615-CaptivePortal"); //create portal with timeout
+}
+```
+
+Merk eveneens het volgende op in de code:
+
+```cpp
+std::vector<const char *> portalMenu  = {"wifi","info","exit","sep","erase","update"};  //create menu with following possibilities, "sep" is seperator
+portal.setMenu(portalMenu);
+```
+
+De layout van het *captive portal* kan herschikt worden naar believen, alsook kan er door de gebruiker beslist worden welke zaken er actief moeten zijn. Het bestand `strings_en.h` die in de bibliotheek terug te vinden is beschrijft alle mogelijkheden, aangezien de documentatie hier te wensen overlaat:
+
+```cpp
+const char * const HTTP_PORTAL_MENU[] PROGMEM = {
+"<form action='/wifi'    method='get'><button>Configure WiFi</button></form><br/>\n", // MENU_WIFI
+"<form action='/0wifi'   method='get'><button>Configure WiFi (No Scan)</button></form><br/>\n", // MENU_WIFINOSCAN
+"<form action='/info'    method='get'><button>Info</button></form><br/>\n", // MENU_INFO
+"<form action='/param'   method='get'><button>Setup</button></form><br/>\n",//MENU_PARAM
+"<form action='/close'   method='get'><button>Close</button></form><br/>\n", // MENU_CLOSE
+"<form action='/restart' method='get'><button>Restart</button></form><br/>\n",// MENU_RESTART
+"<form action='/exit'    method='get'><button>Exit</button></form><br/>\n",  // MENU_EXIT
+"<form action='/erase'   method='get'><button class='D'>Erase</button></form><br/>\n", // MENU_ERASE
+"<form action='/update'  method='get'><button>Update</button></form><br/>\n",// MENU_UPDATE
+"<hr><br/>" // MENU_SEP
+};
+```
+
 # Extra instellingen
+
+De *WiFi Manager* biedt ook de mogelijkheid om *custom parameters* door te geven. Indien ons toestel naast verbinding met het WiFi netwerk ook nog andere verbindingen moeten maken over het internet, met bijvoorbeeld *cloud* toepassingen, moeten ook hiervoor *credentials* kunnen opgegeven worden.
+
 # Custom menu's & HTML
 # OTA
