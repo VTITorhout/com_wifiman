@@ -225,15 +225,207 @@ WiFiManagerParameter(const char *id, const char *label);
 WiFiManagerParameter(const char *id, const char *label, const char *defaultValue, int length);
 WiFiManagerParameter(const char *id, const char *label, const char *defaultValue, int length, const char *custom);
 WiFiManagerParameter(const char *id, const char *label, const char *defaultValue, int length, const char *custom, int labelPlacement);
-```cpp
+```
 
 Hierbij zijn volgende zaken van belang:
 * `id`: unieke ID waarmee de parameter kan benaderd worden (in HTML).
 * `label`: tekst die voor het gebruikersveld moet geplaatst worden.
 * `defaultValue`: inhoud van het veld, kan gebruikt worden indien de *setting* die reeds in het geheugen zit moet weergegeven worden.
-* `length`:
-* `custom`:
+* `length`: maximale lengte van het veld
+* `custom`: additionele HTML code die toegevoegd moet worden, kan gebruikt worden om bijvoorbeeld [*regular expressions*](https://en.wikipedia.org/wiki/Regular_expression) toe te voegen.
 
+Als voorbeeld wordt het gebruik van een MQTT verbinding genomen. Om deze verbinding te kunnen realiseren is er nood aan een serveradres, een poort en al dan niet een gebruikersnaam en wachtwoord. Voor de MQTT code wordt verwezen naar de module [MQTT](https://innovet-mqtt.netlify.app/#esp32) die eveneens terug te vinden is op [stem-ict.be](https://stem-ict.be).
+
+```cpp
+WiFiManagerParameter custom_mqtt_server("server", "MQTT server", mqtt.server, 60,"pattern='([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:\\/~+#-]*[\\w@?^=%&\\/~+#-])'");
+WiFiManagerParameter custom_mqtt_port("port", "MQTT port", mqtt.port, 5,"pattern='\\d{1,5}'");
+WiFiManagerParameter custom_mqtt_user("user", "MQTT user", mqtt.user, 30);
+WiFiManagerParameter custom_mqtt_pass("pass", "MQTT password", mqtt.password, 20,"type='password'");
+```
+
+Bovenstaande code beschrijft de additionele parameter die nodig zijn voor de MQTT verbinding. Merk op dat er gebruik is gemaakt van extra HTML code die de invoer van de velden controleert of er een wachtwoord veld van maakt.
+
+Indien we ook `param` toevoegen aan het menu kunnen we met deze pagina de 4 velden weergeven en aanpassen. Vergeet wel niet ook de extra parameters aan de *wifi manager* door te geven.
+
+```cpp
+portal.addParameter(&custom_mqtt_server);
+portal.addParameter(&custom_mqtt_port);
+portal.addParameter(&custom_mqtt_user);
+portal.addParameter(&custom_mqtt_pass);
+std::vector<const char *> portalMenu  = {"wifi","param","info","exit","sep","erase","update"};  //create menu with following possibilities, "sep" is seperator
+portal.setMenu(portalMenu);
+``` 
+
+De `param` pagina is iets die geleidelijk aan bij de code is toegevoegd. De interactie met de gebuiker is hiervoor niet optimaal, en het opslaan van de parameters gebeurd niet door de bibiliotheek, maar moet de gebruiker zelf voor instaan. Er kunnen hiervoor wel *callbacks* ingevoerd worden. Dit zijn *jumps* naar specifieke gebruikerscode die toelaten tussendoor extra zaken uit te voeren.
+
+```cpp
+portal.setPreSaveParamsCallback(saveParamsCallback);  //needed to trigger save
+```
+
+Ergens in de code moet dan de subroutine `saveParamsCallback` terug te vinden zijn. In die subroutine zouden we de parameters meteen kunnen opslaan, maar de code wordt geschreven dat de wifi manager en alles die er bij hoort enkel maar in de *scope* `setupWifi` bestaat. Hierdoor kunnen we de parameters niet benaderen vanuit een andere *scope*, en zal dit op een andere manier moeten opgelost worden. De oplossing bestaat er in een *boolean* te setten die *globaal* bestaat zodat deze ook kan geraadpleegd worden in een andere *scope*. 
+
+```cpp
+bool shouldSaveParams = false;
+void saveParamsCallback () {
+  shouldSaveParams = true;
+}
+```
+
+in de `setupWifi` controleren we vervolgens of deze *boolean* geset is en voeren we de noodzakelijke acties uit:
+
+```cpp
+if(shouldSaveParams){ //params have been update, continue
+  //retrieve values
+  strcpy(mqtt.server, custom_mqtt_server.getValue());
+  strcpy(mqtt.port, custom_mqtt_port.getValue());
+  strcpy(mqtt.user, custom_mqtt_user.getValue());
+  strcpy(mqtt.password, custom_mqtt_pass.getValue());
+  Serial.printf("MQTT:\tWill save next params\r\n\tServer: %s\r\n\tPort: %s\r\n\tUser: %s\r\n\tPassword: %s\r\n",mqtt.server,mqtt.port,mqtt.user,mqtt.password);
+  ...
+  shouldSaveParams = false;
+}
+```
+
+Het grote probleem die dan optreedt is dat we gebruik wensen te maken van een timeout, en zolang er iemand verbonden blijft met het *captive portal* zal er geen timeout optreden en blijft de code dan ook hangen bij de routine `portal.startConfigPortal("615-CaptivePortal");`. De `if` functie wordt nooit bereikt. De oplossing bestaat er nu in het *captive portal* niet te gebruiken als *blocking code*, maar zelf deze te *processen*. Daarvoor passen we de code aan als volgt:
+
+```cpp
+uint32_t portalStarted = millis();
+portal.setConfigPortalBlocking(false);  //we will process the portal by ourselves
+portal.startConfigPortal("615-CaptivePortal");
+while((portalStarted+timeout*1000)>millis()){
+  portal.process(); //there is time left
+}
+```
+
+Hierbij is het jammergenoeg onmogelijk te controleren of er een gebruiker verbonden is met het *captive portal*, want indien er een verbinding moet er geen timeout optreden. Om dit op te lossen zullen we de bibliotheek **manueel** moeten aanpassen. In de bibliotheek is de *private* functie `uint8_t WiFi_softap_num_stations();` opgenomen. Als we deze *public* plaatsen kunnen we dit gebruiken om de timeout te resetten:
+
+```cpp
+if(portal.WiFi_softap_num_stations()>0){ //there are clients connected, reset timeout
+  portalStarted = millis(); //reset current time
+}
+```
+
+HIER KOMT NOG EEN GEDEELTE OVER PREFERENCES
+
+De totale code zou er dan als volgt kunnen uitzien:
+
+```cpp
+#include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
+#include <Preferences.h>  //needed to save force parameters
+
+#define GO_INTO_SETUP 23
+
+Preferences pref;  //
+
+struct mqttSettings{
+  char server[60];
+  char port[6];
+  char user[30];
+  char password[20];
+};
+mqttSettings mqtt;
+
+bool wifiConnected; //to prevent user software to execute
+
+void loadConfig(){
+  pref.begin("mqtt",false); //start namespace "mqtt" in R/W mode
+  strcpy(mqtt.server,pref.getString("server","").c_str());
+  strcpy(mqtt.port,pref.getString("port","").c_str());
+  strcpy(mqtt.user,pref.getString("user","").c_str());
+  strcpy(mqtt.password,pref.getString("password","").c_str());
+  Serial.printf("MQTT:\tLoaded next params\r\n\tServer: %s\r\n\tPort: %s\r\n\tUser: %s\r\n\tPassword: %s\r\n",mqtt.server,mqtt.port,mqtt.user,mqtt.password);
+  pref.end();
+}
+
+bool shouldSaveParams = false;
+bool shouldClosePortal = false;
+
+void saveParamsCallback () {
+  shouldSaveParams = true;
+}
+
+void saveWifiCallback () {
+  shouldClosePortal = true;
+}
+
+bool setupWifi(uint16_t timeout = 0){
+  WiFiManager portal; //create local instance of wifi manager
+  portal.setEnableConfigPortal(false);  //prevent entering captive portal if connection failed, need this just to test if connection could be made (timeout=0)
+  if(timeout){  //we need the captive portal
+    uint32_t portalStarted = millis();
+    std::vector<const char *> portalMenu  = {"wifi","param","info","exit","sep","erase","update"};  //create menu with following possibilities, "sep" is seperator
+    portal.setMenu(portalMenu);
+    WiFiManagerParameter custom_mqtt_server("server", "MQTT server", mqtt.server, 60,"pattern='([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:\\/~+#-]*[\\w@?^=%&\\/~+#-])'");
+    WiFiManagerParameter custom_mqtt_port("port", "MQTT port", mqtt.port, 5,"pattern='\\d{1,5}'");
+    WiFiManagerParameter custom_mqtt_user("user", "MQTT user", mqtt.user, 30);
+    WiFiManagerParameter custom_mqtt_pass("pass", "MQTT password", mqtt.password, 20,"type='password'");
+    portal.addParameter(&custom_mqtt_server);
+    portal.addParameter(&custom_mqtt_port);
+    portal.addParameter(&custom_mqtt_user);
+    portal.addParameter(&custom_mqtt_pass);
+    portal.setPreSaveParamsCallback(saveParamsCallback);  //needed to trigger save
+    portal.setPreSaveConfigCallback(saveWifiCallback);  //needed to close portal
+    portal.setConfigPortalBlocking(false);  //we will process the portal by ourselves
+    portal.startConfigPortal("615-CaptivePortal");
+    while((portalStarted+timeout*1000)>millis()){
+      portal.process(); //there is time left
+      if(portal.WiFi_softap_num_stations()>0){ //there are clients connected, reset timeout
+        portalStarted = millis(); //reset current time
+      }
+      if(shouldSaveParams){ //params have been update, continue
+        //retrieve values
+        strcpy(mqtt.server, custom_mqtt_server.getValue());
+        strcpy(mqtt.port, custom_mqtt_port.getValue());
+        strcpy(mqtt.user, custom_mqtt_user.getValue());
+        strcpy(mqtt.password, custom_mqtt_pass.getValue());
+        //begin saving values
+        pref.begin("mqtt",false); //start namespace "mqtt" in R/W mode
+        Serial.printf("MQTT:\tWill save next params\r\n\tServer: %s\r\n\tPort: %s\r\n\tUser: %s\r\n\tPassword: %s\r\n",mqtt.server,mqtt.port,mqtt.user,mqtt.password);
+        pref.putString("server",mqtt.server);
+        pref.putString("port",mqtt.port);
+        pref.putString("user",mqtt.user);
+        pref.putString("password",mqtt.password);
+        pref.end();
+        Serial.println("MQTT:\tSettings have been saved!");
+        shouldSaveParams = false;
+        shouldClosePortal = true;
+      }
+      if(shouldClosePortal){
+        portal.stopWebPortal();
+        shouldClosePortal = false;
+        break;  //break the while
+      }
+    }
+  }
+  bool test = portal.autoConnect(); //check if credentials are OK
+  if(!test){
+    //provided credentials does not result in connection to AP
+    Serial.printf("WiFi:\tUnable to connect to SSID \"%s\"\r\n",portal.getWiFiSSID());
+  }else{
+    Serial.printf("WiFi:\tSuccesfully connected to SSID \"%s\"\r\n",portal.getWiFiSSID());
+  }
+  return test;  //return connection result to requester
+}
+
+void setup(){
+  Serial.begin(115200); //needed for debug, library will output a lot (due to beta version)
+  pinMode(GO_INTO_SETUP,INPUT_PULLUP);
+  loadConfig(); //load settings of MQTT
+  wifiConnected = setupWifi(); //just check if we get connected, settings are done on request
+  Serial.println("PRG:\tEntering loop");
+}
+
+void loop(){
+  if(wifiConnected){
+    //user code
+  }
+  //check if we want to enter setup
+  if(!digitalRead(GO_INTO_SETUP)){
+    wifiConnected = setupWifi(60); //setup wifi with timeout of 60 seconds
+  }
+}
+```
+ 
 
 # Custom menu's & HTML
 # OTA
