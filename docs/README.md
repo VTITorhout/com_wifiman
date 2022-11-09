@@ -15,7 +15,8 @@ Tijdens deze module worden de meest essentiële zaken aangehaald in verschillend
 1. [Basis configuratie](#basis-captive-portal) voor het *captive portal* om verbinding te maken met een privé netwerk
 2. Opstarten van het *captive portal* op [aanvraag](#captive-portal-on-request) van de gebruiker
 3. [Extra instellingen](#extra-instellingen) afvragen en opslaan
-4. [Custom](#custom-menus--html) menu's / HTML
+4. [Custom](#extra-instellingen) menu's / HTML
+5. [Over The Air](#ota) upgraden van de firmware
 
 # Installatie bibiliotheek
 
@@ -297,7 +298,7 @@ while((portalStarted+timeout*1000)>millis()){
 }
 ```
 
-Hierbij is het jammergenoeg onmogelijk te controleren of er een gebruiker verbonden is met het *captive portal*, want indien er een verbinding moet er geen timeout optreden. Om dit op te lossen zullen we de bibliotheek **manueel** moeten aanpassen. In de bibliotheek is de *private* functie `uint8_t WiFi_softap_num_stations();` opgenomen. Als we deze *public* plaatsen kunnen we dit gebruiken om de timeout te resetten:
+Hierbij is het jammergenoeg onmogelijk te controleren of er een gebruiker verbonden is met het *captive portal*, want indien er een verbinding is moet er geen timeout optreden. Om dit op te lossen zullen we de bibliotheek **manueel** moeten aanpassen. In de bibliotheek is de *private* functie `uint8_t WiFi_softap_num_stations();` opgenomen. Als we deze *public* plaatsen kunnen we dit gebruiken om de timeout te resetten:
 
 ```cpp
 if(portal.WiFi_softap_num_stations()>0){ //there are clients connected, reset timeout
@@ -305,7 +306,70 @@ if(portal.WiFi_softap_num_stations()>0){ //there are clients connected, reset ti
 }
 ```
 
-HIER KOMT NOG EEN GEDEELTE OVER PREFERENCES
+Eerder werd aangehaald dat het aan de gebruiker is om de extra parameters ook zelf te verwerken. De SSID en het paswoord van de WiFi worden door de bibliotheek opgeslagen in NVRAM/flash. De extra parameters worden nergens opgeslagen. Ook deze extra parameters wensen we te behouden tijdens onderbrekingen van de spanning. Hiervoor moeten we zelf de parameters opslaan in NVRAM/flash. 
+
+De eenvoudigste manier om dit te bereiken is a.d.h.v. de bibliotheek *preferences* die standaard opgenomen is in de Arduino omgeving voor de ESP processoren. In oudere versies moest gebruik gemaakt worden van de bibliotheek *EEPROM*, maar deze is ondertussen *obsolete* geworden. 
+
+De bibliotheek *preferences* laat toe een *namespace* te openen waar verschillende variabelen kunnen gestockeerd worden. Dit gebeurd als volgt:
+```cpp
+#include <Preferences.h>  //needed to save force parameters
+Preferences pref;  //create a preference object
+pref.begin("mqtt",false); //start namespace "mqtt" in R/W mode
+...
+pref.end();
+```
+
+Merk op dat voor de naam van de *namespace* een willekeurige naam kan gekozen worden, maar dat deze in lengte gelimiteerd is tot 15 karakters. Hier is geopteerd voor *mqtt* aangezien we de connectiegegevens van een MQTT server gaan opslaan.
+
+Op de plaats van de `...` kunnen we de variabelen benaderen als een *key-value* paar. Dit stemt heel goed overeen met hoe een JSON object is opgebouwd. Voor de mogelijkheden van de data formaten wordt verwezen naar de [*readthedocs*](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/api/preferences.html) van de bibliotheek.
+
+Aangezien de variabelen zich in NVRAM/flash bevinden moeten we deze van en naar het werkgeheugen (RAM) verplaatsen vooraleer we deze kunnen bewerken. Dit gebeurd a.d.h.v. `getString(key)` en `putString(key,value)`. Om de variabelen te groeperen maken we gebruik van een *struct* waarin de variabelen passen.
+
+```cpp
+struct mqttSettings{
+  char server[60];
+  char port[6];
+  char user[30];
+  char password[20];
+};
+mqttSettings mqtt;
+```
+
+Tijdens het starten van het programma laden we de *namespace* mqtt en halen we de variabelen op uit NVRAM/flash a.d.h.v. hun key. We plaatsen deze meteen in onze *struct*:
+```cpp
+pref.begin("mqtt",false); //start namespace "mqtt" in R/W mode
+  strcpy(mqtt.server,pref.getString("server","").c_str());
+  strcpy(mqtt.port,pref.getString("port","").c_str());
+  strcpy(mqtt.user,pref.getString("user","").c_str());
+  strcpy(mqtt.password,pref.getString("password","").c_str());
+  Serial.printf("MQTT:\tLoaded next params\r\n\tServer: %s\r\n\tPort: %s\r\n\tUser: %s\r\n\tPassword: %s\r\n",mqtt.server,mqtt.port,mqtt.user,mqtt.password);
+pref.end();
+```
+
+Het stukje code `.c_str()` na het ophalen van de *string* zet deze om naar een *null-terminated character array*. Het is beter gebruik te maken van in lengte gelimiteerde *character arrays* dan van *strings* die mogelijk voor gefragmenteerd geheugen zullen zorgen.
+
+Eenzelfde iets voeren we uit wanneer de gebruiker nieuwe waarden opslaat via de *param* pagina:
+
+```cpp
+//retrieve values
+  strcpy(mqtt.server, custom_mqtt_server.getValue());
+  strcpy(mqtt.port, custom_mqtt_port.getValue());
+  strcpy(mqtt.user, custom_mqtt_user.getValue());
+  strcpy(mqtt.password, custom_mqtt_pass.getValue());
+//begin saving values
+  pref.begin("mqtt",false); //start namespace "mqtt" in R/W mode
+  Serial.printf("MQTT:\tWill save next params\r\n\tServer: %s\r\n\tPort: %s\r\n\tUser: %s\r\n\tPassword: %s\r\n",mqtt.server,mqtt.port,mqtt.user,mqtt.password);
+    pref.putString("server",mqtt.server);
+    pref.putString("port",mqtt.port);
+    pref.putString("user",mqtt.user);
+    pref.putString("password",mqtt.password);
+  pref.end();
+  Serial.println("MQTT:\tSettings have been saved!");
+```
+
+De ingegeven waarden worden opgeslagen via de URL, dit a.d.h.v. een [POST](https://en.wikipedia.org/wiki/POST_(HTTP)). Deze komen dus niet in een variabele in de code terecht, maar moeten opgevraagd worden via de bibliotheek. De waarde moet hierna gekopieerd worden naar de *struct* zodat er verder mee kan gewerkt worden. 
+
+Eenmaal deze in de struct terecht zijn gekomen worden ze verplaatst naar NVRAM/flash.
 
 De totale code zou er dan als volgt kunnen uitzien:
 
@@ -425,7 +489,5 @@ void loop(){
   }
 }
 ```
- 
 
-# Custom menu's & HTML
 # OTA
