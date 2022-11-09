@@ -308,7 +308,7 @@ if(portal.WiFi_softap_num_stations()>0){ //there are clients connected, reset ti
 
 Eerder werd aangehaald dat het aan de gebruiker is om de extra parameters ook zelf te verwerken. De SSID en het paswoord van de WiFi worden door de bibliotheek opgeslagen in NVRAM/flash. De extra parameters worden nergens opgeslagen. Ook deze extra parameters wensen we te behouden tijdens onderbrekingen van de spanning. Hiervoor moeten we zelf de parameters opslaan in NVRAM/flash. 
 
-De eenvoudigste manier om dit te bereiken is a.d.h.v. de bibliotheek *preferences* die standaard opgenomen is in de Arduino omgeving voor de ESP processoren. In oudere versies moest gebruik gemaakt worden van de bibliotheek *EEPROM*, maar deze is ondertussen *obsolete* geworden. 
+De eenvoudigste manier om dit te bereiken is a.d.h.v. de bibliotheek *preferences* die standaard opgenomen is in de Arduino omgeving voor de ESP processoren. In oudere versies van de [IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/) moest gebruik gemaakt worden van de bibliotheek *EEPROM*, maar deze is ondertussen *obsolete* geworden. 
 
 De bibliotheek *preferences* laat toe een *namespace* te openen waar verschillende variabelen kunnen gestockeerd worden. Dit gebeurd als volgt:
 ```cpp
@@ -319,7 +319,7 @@ pref.begin("mqtt",false); //start namespace "mqtt" in R/W mode
 pref.end();
 ```
 
-Merk op dat voor de naam van de *namespace* een willekeurige naam kan gekozen worden, maar dat deze in lengte gelimiteerd is tot 15 karakters. Hier is geopteerd voor *mqtt* aangezien we de connectiegegevens van een MQTT server gaan opslaan.
+Merk op dat voor de naam van de *namespace* een willekeurige naam kan gekozen worden, maar dat deze in lengte gelimiteerd is tot 15 karakters. Hier is geopteerd voor `mqtt` aangezien we de connectiegegevens van een MQTT server gaan opslaan.
 
 Op de plaats van de `...` kunnen we de variabelen benaderen als een *key-value* paar. Dit stemt heel goed overeen met hoe een JSON object is opgebouwd. Voor de mogelijkheden van de data formaten wordt verwezen naar de [*readthedocs*](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/api/preferences.html) van de bibliotheek.
 
@@ -367,7 +367,7 @@ Eenzelfde iets voeren we uit wanneer de gebruiker nieuwe waarden opslaat via de 
   Serial.println("MQTT:\tSettings have been saved!");
 ```
 
-De ingegeven waarden worden opgeslagen via de URL, dit a.d.h.v. een [POST](https://en.wikipedia.org/wiki/POST_(HTTP)). Deze komen dus niet in een variabele in de code terecht, maar moeten opgevraagd worden via de bibliotheek. De waarde moet hierna gekopieerd worden naar de *struct* zodat er verder mee kan gewerkt worden. 
+De ingegeven waarden worden opgeslagen via de URL, dit a.d.h.v. een [POST](https://en.wikipedia.org/wiki/POST_(HTTP)). Deze komen dus niet in een variabele in de code terecht, maar moeten opgevraagd worden via de bibliotheek *wifimanager*. De waarde moet hierna gekopieerd worden naar de *struct* zodat er verder mee kan gewerkt worden. 
 
 Eenmaal deze in de struct terecht zijn gekomen worden ze verplaatst naar NVRAM/flash.
 
