@@ -1,4 +1,6 @@
-# Inleiding
+## Gebruik van WiFi Manager voor projecten
+
+#### Inleiding
 
 Wanneer een toestel aangekocht wordt die verbinding moet maken met een privé netwerk is de manier van werken meestal als volgt:
 1. Het  toestel start op in *acces point* (AP) mode en creëert hierbij een WiFi netwerk met een eigen SSID waarop *gebruikers* kunnen verbinden. Bij het verbinden met het netwerk krijgt de gebruiker een *landingspagina* voorgeschoteld (dit is de *captive portal*), waarop de essentiële instellingen kunnen gemaakt worden. Bij de meest essentiële instellingen behoort de keuze om te verbinden met het privé netwerk van de gebruiker met bijhorend wachtwoord. Optionele instellingen kunnen hier ook gemaakt worden.
@@ -12,13 +14,13 @@ Wanneer een toestel aangekocht wordt die verbinding moet maken met een privé ne
 ![ESP32 als STA](./assets/esp32_sta.png)
 	
 Tijdens deze module worden de meest essentiële zaken aangehaald in verschillende stappen, gaande van basis tot expert.
-1. [Basis configuratie](#basis-captive-portal) voor het *captive portal* om verbinding te maken met een privé netwerk
-2. Opstarten van het *captive portal* op [aanvraag](#captive-portal-on-request) van de gebruiker
-3. [Extra instellingen](#extra-instellingen) afvragen en opslaan
-4. [Custom](#extra-instellingen) menu's / HTML
-5. [Over The Air](#ota) upgraden van de firmware
+1. [Basis configuratie](##basis-captive-portal) voor het *captive portal* om verbinding te maken met een privé netwerk
+2. Opstarten van het *captive portal* op [aanvraag](##captive-portal-on-request) van de gebruiker
+3. [Extra instellingen](##extra-instellingen) afvragen en opslaan
+4. [Custom](##extra-instellingen) menu's / HTML
+5. [Over The Air](##ota) upgraden van de firmware
 
-# Installatie bibiliotheek
+#### Installatie bibiliotheek
 
 In principe zouden we alles van nodige software zelf kunnen schrijven, maar de gebruikers *tablatronix* en *tzapu* op GitHub hebben reeds een bibliotheek ontwikkeld die geschikt is voor dit doel. We gaan dan ook gebruik maken van deze bibliotheek.
 
@@ -30,12 +32,12 @@ Merk op dat deze bibliotheek zeer uitgebreid is en dat er momenteel nog veel wor
 
 ![Correcte header file](./assets/bib_tag.png)
 
-# Basis captive portal
+#### Basis captive portal
 
 Het meest essentiële onderdeel is het verbinden met een privé WiFi-netwerk. Hiervoor gaan we volgende basis code gebruiken:
 
 ```cpp
-#include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
+##include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
 
 void setup(){
   Serial.begin(115200); //needed for debug, library will output a lot (due to beta version)
@@ -87,7 +89,7 @@ Bij het resetten van het programma is het volgende te zien in de seriële monito
 
 De *captive portal* wordt nog niet gestart. Er wordt eerst geprobeerd verbinding te maken het de huidige *credentials*. Dit lukt hier binnen de twee seconden en meteen wordt overgegaan op het gebruikersprogramma (in de loop).
 
-# Captive portal on request
+#### Captive portal on request
 
 Merk op dat bij vorig programma de *credentials* gewist werden wanneer er geen verbinding kon gemaakt worden. Dit is op zich goed om te testen, maar niet voor productie. Stel dat het netwerk even offline is, dan zal het toestel zijn *credentials* verwijderen, wat natuurlijk ongewenst is. 
 
@@ -96,9 +98,9 @@ Maar wat indien we ons vergist hebben van wachtwoord? Of dat we ons privé netwe
 Onderstaande (herschreven) code bied hier een oplossing. Pin 23 (of andere, vrij te kiezen) wordt gebruikt om het *captive portal* op te roepen. Er is een functie geschreven die zich bezig houdt met het *captive portal*, en die kan aangeroepen worden met al dan niet een timeout. Indien er geen timeout opgegeven wordt, wordt gewoonweg geprobeerd om te verbinden met het netwerk met de huidige *credentials*. Indien wel een timeout wordt opgegeven wordt het *captive portal* gestart voor een bepaalde periode, zodat de gebruiker opnieuw kan verbinden om de instellingen te wijzigen. Het wijzigen kan het wissen of het aanpassen zijn van de *credentials*.
 
 ```cpp
-#include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
+##include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
 
-#define GO_INTO_SETUP 23
+##define GO_INTO_SETUP 23
 
 bool wifiConnected; //to prevent user software to execute
 
@@ -160,7 +162,7 @@ Net zoals bij het vorige programma kan op een identieke manier de *credentials* 
 Het gedeelte rond het *captive portal* is echter wel herschreven. Er kan hier een extra parameter *timeout* meegegeven worden.
 * Indien timeout = 0 wordt er enkel getest of de opgegeven *credentials* leiden tot een verbinding. Hiervan wordt gebruik gemaakt in de setup.
 * Indien timeout > 0 wordt een *captive portal* gestart. Indien er geen verbinding met het *captive portal* binnen de opgegeven *timeout* wordt gemaakt wordt er teruggekeerd naar het gebruikersprogramma.
-* Indien er een gebruiker verbinding maakt met het *captive portal* stopt de *timeout* zolang de gebruiker verbonden blijft. Dit kan (en zal) echter in sommige gevallen problemen met zich meebrengen. Zie hier voor het onderdeel [extra instellingen](#extra-instellingen).
+* Indien er een gebruiker verbinding maakt met het *captive portal* stopt de *timeout* zolang de gebruiker verbonden blijft. Dit kan (en zal) echter in sommige gevallen problemen met zich meebrengen. Zie hier voor het onderdeel [extra instellingen](##extra-instellingen).
 
 Bovenstaande gebeurd door middel van volgende code:
 
@@ -205,15 +207,15 @@ const char * const HTTP_PORTAL_MENU[] PROGMEM = {
 
 Merk op dat er nog extra mogelijkheden zijn:
 * `0wifi`: identiek als `wifi`, maar dan zonder het scannen tijdens het openen. Hier moet je manueel de SSID opgeven.
-* `param`: mogelijkheid tot [extra instellingen](#extra-instellingen).
+* `param`: mogelijkheid tot [extra instellingen](##extra-instellingen).
 * `close`: het menu van de *captive portal* wordt hierdoor verlaten, maar de *captive portal* blijft actief.
 * `restart`: de ESP wordt hierdoor herstart.
 
-# Extra instellingen
+#### Extra instellingen
 
 De *WiFi Manager* biedt ook de mogelijkheid om *custom parameters* door te geven. Indien ons toestel naast verbinding met het WiFi netwerk ook nog andere verbindingen moeten maken over het internet, met bijvoorbeeld *cloud* toepassingen, moeten ook hiervoor *credentials* kunnen opgegeven worden.
 
-In het onderdeel [captive portal on request](#captive-portal-on-request) was reeds vermelding gemaakt van `param` die aan het menu kan toegevoegd worden. Deze mogelijkheid in de bibliotheek creëert een extra pagina waarop gebruikerparameters kunnen geplaatst worden. Het toevoegen van gebruikerparameters kan vervolgens gebeuren door het commando `bool addParameter(WiFiManagerParameter *p);`, waarbij `WiFiManagerParameter` als volgt moet opgebouwd worden:
+In het onderdeel [captive portal on request](##captive-portal-on-request) was reeds vermelding gemaakt van `param` die aan het menu kan toegevoegd worden. Deze mogelijkheid in de bibliotheek creëert een extra pagina waarop gebruikerparameters kunnen geplaatst worden. Het toevoegen van gebruikerparameters kan vervolgens gebeuren door het commando `bool addParameter(WiFiManagerParameter *p);`, waarbij `WiFiManagerParameter` als volgt moet opgebouwd worden:
 
 ```cpp
 /** 
@@ -235,10 +237,10 @@ Hierbij zijn volgende zaken van belang:
 * `length`: maximale lengte van het veld
 * `custom`: additionele HTML code die toegevoegd moet worden, kan gebruikt worden om bijvoorbeeld [*regular expressions*](https://en.wikipedia.org/wiki/Regular_expression) toe te voegen.
 
-Als voorbeeld wordt het gebruik van een MQTT verbinding genomen. Om deze verbinding te kunnen realiseren is er nood aan een serveradres, een poort en al dan niet een gebruikersnaam en wachtwoord. Voor de MQTT code wordt verwezen naar de module [MQTT](https://innovet-mqtt.netlify.app/#esp32) die eveneens terug te vinden is op [stem-ict.be](https://stem-ict.be).
+Als voorbeeld wordt het gebruik van een MQTT verbinding genomen. Om deze verbinding te kunnen realiseren is er nood aan een serveradres, een poort en al dan niet een gebruikersnaam en wachtwoord. Voor de MQTT code wordt verwezen naar de module [MQTT](https://innovet-mqtt.netlify.app/##esp32) die eveneens terug te vinden is op [stem-ict.be](https://stem-ict.be).
 
 ```cpp
-WiFiManagerParameter custom_mqtt_server("server", "MQTT server", mqtt.server, 60,"pattern='([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:\\/~+#-]*[\\w@?^=%&\\/~+#-])'");
+WiFiManagerParameter custom_mqtt_server("server", "MQTT server", mqtt.server, 60,"pattern='([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:\\/~+##-]*[\\w@?^=%&\\/~+##-])'");
 WiFiManagerParameter custom_mqtt_port("port", "MQTT port", mqtt.port, 5,"pattern='\\d{1,5}'");
 WiFiManagerParameter custom_mqtt_user("user", "MQTT user", mqtt.user, 30);
 WiFiManagerParameter custom_mqtt_pass("pass", "MQTT password", mqtt.password, 20,"type='password'");
@@ -312,7 +314,7 @@ De eenvoudigste manier om dit te bereiken is a.d.h.v. de bibliotheek *preference
 
 De bibliotheek *preferences* laat toe een *namespace* te openen waar verschillende variabelen kunnen gestockeerd worden. Dit gebeurd als volgt:
 ```cpp
-#include <Preferences.h>  //needed to save force parameters
+##include <Preferences.h>  //needed to save force parameters
 Preferences pref;  //create a preference object
 pref.begin("mqtt",false); //start namespace "mqtt" in R/W mode
 ...
@@ -323,7 +325,7 @@ Merk op dat voor de naam van de *namespace* een willekeurige naam kan gekozen wo
 
 Op de plaats van de `...` kunnen we de variabelen benaderen als een *key-value* paar. Dit stemt heel goed overeen met hoe een JSON object is opgebouwd. Voor de mogelijkheden van de data formaten wordt verwezen naar de [*readthedocs*](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/api/preferences.html) van de bibliotheek.
 
-Aangezien de variabelen zich in NVRAM/flash bevinden moeten we deze van en naar het werkgeheugen (RAM) verplaatsen vooraleer we deze kunnen bewerken. Dit gebeurd a.d.h.v. `getString(key)` en `putString(key,value)`. Om de variabelen te groeperen maken we gebruik van een *struct* waarin de variabelen passen.
+Aangezien de variabelen zich in NVRAM/flash bevinden moeten we deze van en naar het werkgeheugen (RAM) verplaatsen vooraleer we deze kunnen bewerken. Dit gebeurd a.d.h.v. `getString(key,default value)` en `putString(key,value)`. Om de variabelen te groeperen maken we gebruik van een *struct* waarin de variabelen passen.
 
 ```cpp
 struct mqttSettings{
@@ -335,7 +337,7 @@ struct mqttSettings{
 mqttSettings mqtt;
 ```
 
-Tijdens het starten van het programma laden we de *namespace* mqtt en halen we de variabelen op uit NVRAM/flash a.d.h.v. hun key. We plaatsen deze meteen in onze *struct*:
+Tijdens het starten van het programma laden we de *namespace* mqtt en halen we de variabelen op uit NVRAM/flash a.d.h.v. hun key. Indien deze niet bestaat laden we een lege array in. We plaatsen deze meteen in onze *struct*:
 ```cpp
 pref.begin("mqtt",false); //start namespace "mqtt" in R/W mode
   strcpy(mqtt.server,pref.getString("server","").c_str());
@@ -374,10 +376,10 @@ Eenmaal deze in de struct terecht zijn gekomen worden ze verplaatst naar NVRAM/f
 De totale code zou er dan als volgt kunnen uitzien:
 
 ```cpp
-#include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
-#include <Preferences.h>  //needed to save force parameters
+##include <WiFiManager.h>  //https://github.com/tzapu/WiFiManager
+##include <Preferences.h>  //needed to save force parameters
 
-#define GO_INTO_SETUP 23
+##define GO_INTO_SETUP 23
 
 Preferences pref;  //
 
@@ -419,7 +421,7 @@ bool setupWifi(uint16_t timeout = 0){
     uint32_t portalStarted = millis();
     std::vector<const char *> portalMenu  = {"wifi","param","info","exit","sep","erase","update"};  //create menu with following possibilities, "sep" is seperator
     portal.setMenu(portalMenu);
-    WiFiManagerParameter custom_mqtt_server("server", "MQTT server", mqtt.server, 60,"pattern='([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:\\/~+#-]*[\\w@?^=%&\\/~+#-])'");
+    WiFiManagerParameter custom_mqtt_server("server", "MQTT server", mqtt.server, 60,"pattern='([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:\\/~+##-]*[\\w@?^=%&\\/~+##-])'");
     WiFiManagerParameter custom_mqtt_port("port", "MQTT port", mqtt.port, 5,"pattern='\\d{1,5}'");
     WiFiManagerParameter custom_mqtt_user("user", "MQTT user", mqtt.user, 30);
     WiFiManagerParameter custom_mqtt_pass("pass", "MQTT password", mqtt.password, 20,"type='password'");
@@ -490,4 +492,4 @@ void loop(){
 }
 ```
 
-# OTA
+## OTA
