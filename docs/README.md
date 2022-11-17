@@ -1,4 +1,4 @@
-# Inleiding
+## Inleiding
 
 Wanneer een toestel aangekocht wordt die verbinding moet maken met een privé netwerk is de manier van werken meestal als volgt:
 1. Het  toestel start op in *acces point* (AP) mode en creëert hierbij een WiFi netwerk met een eigen SSID waarop *gebruikers* kunnen verbinden. Bij het verbinden met het netwerk krijgt de gebruiker een *landingspagina* voorgeschoteld (dit is de *captive portal*), waarop de essentiële instellingen kunnen gemaakt worden. Bij de meest essentiële instellingen behoort de keuze om te verbinden met het privé netwerk van de gebruiker met bijhorend wachtwoord. Optionele instellingen kunnen hier ook gemaakt worden.
@@ -18,7 +18,7 @@ Tijdens deze module worden de meest essentiële zaken aangehaald in verschillend
 4. [Custom](#extra-instellingen) menu's / HTML
 5. [Over The Air](#ota) upgraden van de firmware
 
-# Installatie bibiliotheek
+## Installatie bibiliotheek
 
 In principe zouden we alles van nodige software zelf kunnen schrijven, maar de gebruikers *tablatronix* en *tzapu* op GitHub hebben reeds een bibliotheek ontwikkeld die geschikt is voor dit doel. We gaan dan ook gebruik maken van deze bibliotheek.
 
@@ -30,7 +30,7 @@ Merk op dat deze bibliotheek zeer uitgebreid is en dat er momenteel nog veel wor
 
 ![Correcte header file](./assets/bib_tag.png)
 
-# Basis captive portal
+## Basis captive portal
 
 Het meest essentiële onderdeel is het verbinden met een privé WiFi-netwerk. Hiervoor gaan we volgende basis code gebruiken:
 
@@ -87,7 +87,7 @@ Bij het resetten van het programma is het volgende te zien in de seriële monito
 
 De *captive portal* wordt nog niet gestart. Er wordt eerst geprobeerd verbinding te maken het de huidige *credentials*. Dit lukt hier binnen de twee seconden en meteen wordt overgegaan op het gebruikersprogramma (in de loop).
 
-# Captive portal on request
+## Captive portal on request
 
 Merk op dat bij vorig programma de *credentials* gewist werden wanneer er geen verbinding kon gemaakt worden. Dit is op zich goed om te testen, maar niet voor productie. Stel dat het netwerk even offline is, dan zal het toestel zijn *credentials* verwijderen, wat natuurlijk ongewenst is. 
 
@@ -209,7 +209,7 @@ Merk op dat er nog extra mogelijkheden zijn:
 * `close`: het menu van de *captive portal* wordt hierdoor verlaten, maar de *captive portal* blijft actief.
 * `restart`: de ESP wordt hierdoor herstart.
 
-# Extra instellingen
+## Extra instellingen
 
 De *WiFi Manager* biedt ook de mogelijkheid om *custom parameters* door te geven. Indien ons toestel naast verbinding met het WiFi netwerk ook nog andere verbindingen moeten maken over het internet, met bijvoorbeeld *cloud* toepassingen, moeten ook hiervoor *credentials* kunnen opgegeven worden.
 
@@ -490,4 +490,4 @@ void loop(){
 }
 ```
 
-# OTA
+## OTA
